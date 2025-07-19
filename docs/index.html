@@ -1,12 +1,215 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Vascularized Islets Model</title>
-  <meta charset="utf-8" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Islet Viability Model</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    h2 {
+      color: #333;
+      margin: 1em;
+    }
+
+    #container {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      padding: 1em;
+      gap: 2em;
+    }
+
+    #left-panel {
+      flex: 1 1 350px;
+      max-width: 400px;
+    }
+
+    #controls label, #controls select, #controls input {
+      display: block;
+      margin-top: 1em;
+      margin-bottom: 0.2em;
+    }
+
+    #viabilityText {
+      font-size: 1.2em;
+      margin-top: 1em;
+    }
+
+    #params ul {
+      padding-left: 1em;
+    }
+
+    #right-panel {
+      flex: 2 1 600px;
+      min-width: 400px;
+    }
+
+    #plot {
+      width: 100%;
+      height: 600px;
+    }
+
+    @media (max-width: 900px) {
+      #container {
+        flex-direction: column;
+      }
+
+      #plot {
+        height: 400px;
+      }
+    }
+  </style>
 </head>
 <body>
-  <h1>Interactive Tool: Vascularized Islets Model</h1>
-  <p>This is the interactive simulation for our article.</p>
-  <!-- Add your Plotly or JavaScript code here -->
+
+  <h2>Pancreatic Islet Viability Model</h2>
+
+  <div id="container">
+    <div id="left-panel">
+      <div id="controls">
+        <label for="modelType">Model Type:</label>
+        <select id="modelType">
+          <option value="human">Human</option>
+          <option value="mouse">Mouse</option>
+        </select>
+
+        <label for="glucoseLevel">Glucose Level (mM):</label>
+        <select id="glucoseLevel">
+          <option value="6">6</option>
+          <option value="20">20</option>
+        </select>
+
+        <label for="capillaryCount">Number of Capillaries: <span id="capillaryVal">50</span></label>
+        <input type="range" id="capillaryCount" min="5" max="300" step="5" value="50"/>
+
+        <label for="cellCount">Number of Cells: <span id="cellVal">1500</span></label>
+        <input type="range" id="cellCount" min="500" max="4000" step="100" value="1500"/>
+      </div>
+
+      <div id="output">
+        <h3 id="viabilityText"></h3>
+        <div id="params"></div>
+      </div>
+    </div>
+
+    <div id="right-panel">
+      <div id="plot"></div>
+    </div>
+  </div>
+
+  <script>
+    const dataTable = {
+      human: {
+        "6": [0.13, 1.0, 6.82, 1.92, 669.16, -1.70],
+        "20": [0.12, 1.0, 14.23, 1.77, 1271.88, -1.60]
+      },
+      mouse: {
+        "6": [0.14, 1.0, 9.29, 2.02, 969.42, -1.42],
+        "20": [0.14, 1.0, 10.35, 1.71, 872.41, -1.42]
+      }
+    };
+
+    function V(vmin, vmax, ec50c, ncap, nc, ec50n, ncells, nn) {
+      return vmin + (vmax - vmin) / (1 + Math.pow(ec50c / ncap, nc) * Math.pow(ec50n / ncells, nn));
+    }
+
+    function update() {
+      const modelType = document.getElementById("modelType").value;
+      const glucoseLevel = document.getElementById("glucoseLevel").value;
+      const capillaryCount = +document.getElementById("capillaryCount").value;
+      const cellCount = +document.getElementById("cellCount").value;
+
+      document.getElementById("capillaryVal").textContent = capillaryCount;
+      document.getElementById("cellVal").textContent = cellCount;
+
+      const [vmin, vmax, ec50c, nc, ec50n, nn] = dataTable[modelType][glucoseLevel];
+
+      const viability = V(vmin, vmax, ec50c, capillaryCount, nc, ec50n, cellCount, nn);
+
+      document.getElementById("viabilityText").textContent = 
+        `Proportion of Viable Cells: ${viability.toFixed(3)}`;
+
+      document.getElementById("params").innerHTML = `
+        <p><strong>Model Parameters (${modelType.charAt(0).toUpperCase() + modelType.slice(1)}, ${glucoseLevel} mM Glucose):</strong></p>
+        <ul>
+          <li>Vmin = ${vmin}</li>
+          <li>Vmax = ${vmax}</li>
+          <li>EC50 (Capillaries) = ${ec50c}</li>
+          <li>EC50 (Cells) = ${ec50n}</li>
+          <li>nC = ${nc}</li>
+          <li>nN = ${nn}</li>
+        </ul>`;
+
+      const cap = [], cells = [], values = [];
+      for (let c = 5; c <= 300; c += 10) {
+        const row = [];
+        for (let n = 500; n <= 4000; n += 100) {
+          row.push(V(vmin, vmax, ec50c, c, nc, ec50n, n, nn));
+        }
+        cap.push(c);
+        values.push(row);
+      }
+
+      const cellAxis = [];
+      for (let n = 500; n <= 4000; n += 100) {
+        cellAxis.push(n);
+      }
+
+      Plotly.newPlot("plot", [{
+        z: values,
+        x: cellAxis,
+        y: cap,
+        type: 'surface',
+        colorscale: 'RdBu',
+        colorbar: {
+          thickness: 20,
+          len: 0.75,
+          x: 1.1,
+          y: 0.5,
+          title: {
+            text: 'Viability (proportion)',
+            side: 'right'
+          }
+        },
+      }, {
+        type: 'scatter3d',
+        mode: 'markers',
+        x: [cellCount],
+        y: [capillaryCount],
+        z: [viability],
+        marker: { size: 5, color: 'yellow' },
+        name: 'Selected'
+      }], {
+        title: `Islet Viability – ${glucoseLevel} mM Glucose`,
+        margin: { l: 25, r: 25, b: 25, t: 40 },
+        scene: {
+          xaxis: { title: "Cell Count" },
+          yaxis: { title: "Capillary Count" },
+          zaxis: { title: "Viability" },
+          camera: {
+            eye: {
+              x: -2.0,
+              y: -2.0,
+              z: 0.7
+            }
+          },
+        },
+        responsive: true
+      });
+    }
+
+    document.querySelectorAll("select, input").forEach(e => {
+      e.addEventListener("input", update);
+    });
+
+    update(); // initial render
+  </script>
 </body>
 </html>
