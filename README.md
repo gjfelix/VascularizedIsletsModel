@@ -5,7 +5,7 @@ This repository contains:
 - 📎 Supplementary files for the scientific article (see `/supplementary`)
 
 ## 🧬 Try the Interactive Tool
-👉 [Click here](https://gjfelix.github.io/VascularizedIsletsModel/docs/) to launch the model.
+👉 [Click here](https://gjfelix.github.io/VascularizedIsletsModel/) to launch the model.
 
 ## 📎 Supplementary Materials
 - [SupplementaryText.pdf](supplementary/SupplementaryText.pdf)
